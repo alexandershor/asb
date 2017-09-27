@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the ASB Frontpage feature.
+ */
+
+include_once 'asb_frontpage.features.inc';

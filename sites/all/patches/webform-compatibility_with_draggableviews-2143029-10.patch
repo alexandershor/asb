@@ -1,0 +1,31 @@
+diff --git a/views/webform.views.inc b/views/webform.views.inc
+index 209497d..4bbeed7 100644
+--- a/views/webform.views.inc
++++ b/views/webform.views.inc
+@@ -447,6 +447,26 @@ function webform_views_data_alter(&$data) {
+     ),
+   );
+ 
++  // Make the table draggable.
++  if (module_exists('draggableviews')) {
++    $data['webform_submissions']['draggableviews'] = array(
++      'title' => $data['webform_submissions']['table']['group'],
++      'group' => t('Draggableviews'),
++      'help' => t('Provide a draggable functionality.'),
++      'real field' => 'sid',
++      'field' => array(
++        'handler' => 'draggableviews_handler_field_draggable',
++        'click sortable' => FALSE,
++      ),
++    );
++    $data['draggableviews_structure']['table']['join']['webform_submissions'] = array(
++      'handler' => 'draggableviews_join_handler',
++      'left_table' => 'webform_submissions',
++      'left_field' => 'sid',
++      'field' => 'entity_id',
++    );
++  }
++
+ }
+ 
+ /**

@@ -1,0 +1,311 @@
+diff --git a/includes/nodequeue.admin.inc b/includes/nodequeue.admin.inc
+index 65e8d67..4d77305 100644
+--- a/includes/nodequeue.admin.inc
++++ b/includes/nodequeue.admin.inc
+@@ -1042,6 +1042,12 @@ function nodequeue_save_subqueue_order($nodes, $qid, $sqid) {
+   // Invoke a hook to notify other modules of the updated queue.
+   module_invoke_all('nodequeue_update', $qid, $sqid);
+ 
++  // As there's no API for saving a subqueue, we have to trigger the nodequeue save event here.
++  // There might be some other places where we have to add these lines.
++  if (module_exists('rules')) {
++    rules_invoke_event('nodequeue_saved', $subqueue, $nodes);
++  }
++
+   return array(NODEQUEUE_OK, 'The queue has been updated.');
+ }
+ 
+diff --git a/nodequeue.module b/nodequeue.module
+index 95f23af..726ce0d 100644
+--- a/nodequeue.module
++++ b/nodequeue.module
+@@ -230,6 +230,7 @@ function nodequeue_node_delete($node) {
+       // node in a queue twice, the 2nd position would be wrong.
+       nodequeue_subqueue_remove_node($obj->sqid, $node->nid);
+     }
++    rules_invoke_event('nodequeue_node_changed', nodequeue_load_subqueue($obj->sqid), $node);
+   }
+ }
+ 
+@@ -247,6 +248,19 @@ function nodequeue_node_view($node, $view_mode) {
+ }
+ 
+ /**
++ * Implements hook_node_update()
++ */
++function nodequeue_node_update($node) {
++  $result = db_query("SELECT qid, sqid FROM {nodequeue_nodes} WHERE nid =:nid", array(
++    ':nid' => $node->nid,
++  ));
++  foreach ($result as $obj) {
++    rules_invoke_event('nodequeue_node_changed', nodequeue_load_subqueue($obj->sqid), $node);
++  }
++}
++
++
++/**
+  * Implementats hook_forms().
+  */
+ function nodequeue_forms($form_id) {
+@@ -2224,3 +2238,26 @@ function theme_nodequeue_subqueue_full_text() {
+ function theme_nodequeue_subqueue_count_text($variables) {
+   return t('@count in queue', array('@count' => $variables['count']));
+ }
++
++/**
++ * Implements hook_nodequeue_add()
++ */
++function nodequeue_nodequeue_add($sqid, $nid) {
++  // When a node is added to a nodequeue invoke the corresponding rules event
++  $subqueue = nodequeue_load_subqueue($sqid);
++  $node = node_load($nid);
++  rules_invoke_event('nodequeue_added', $subqueue, $node);
++  rules_invoke_event('nodequeue_saved', $subqueue, $node);
++}
++
++/**
++ * Implements hook_nodequeue_remove().
++ */
++function nodequeue_nodequeue_remove($sqid, $nid) {
++  // When a node is removed from a nodequeue invoke the corresponding rules event
++  $subqueue = nodequeue_load_subqueue($sqid);
++  $node = node_load($nid);
++  rules_invoke_event('nodequeue_removed', $subqueue, $node);
++  rules_invoke_event('nodequeue_saved', $subqueue, $node);
++}
++
+diff --git a/nodequeue.rules.inc b/nodequeue.rules.inc
+new file mode 100644
+index 0000000..04702f1
+--- /dev/null
++++ b/nodequeue.rules.inc
+@@ -0,0 +1,229 @@
++<?php
++
++/**
++ * @file
++ * Provides nodequeue (subqueue) rules integration.
++ */
++
++/**
++ * Implementation of hook_rules_event_info().
++ *
++ * Events are triggered by invokations of rules_invoke_event('EVENT_NAME', $nodequeue, $node);
++ */
++function nodequeue_rules_event_info() {
++  $items = array();
++
++  $vars = array(
++    'nodequeue' => array(
++      'label' => t('Changed nodequeue'),
++      'type' => 'nodequeue',
++    ),
++    'node' => array(
++      'type' => 'node',
++      'label' => t('Node'),
++    ),
++  );
++
++  $items['nodequeue_added'] = array(
++    'label' => t('Node has been added to a nodequeue'),
++    'group' => t('Nodequeue'),
++    'variables' => $vars,
++  );
++
++  $items['nodequeue_removed'] = array(
++    'label' => t('Node has been removed from a nodequeue'),
++    'group' => t('Nodequeue'),
++    'variables' => $vars,
++  );
++
++  $items['nodequeue_saved'] = array(
++    'label' => t('A nodequeue has been updated'),
++    'group' => t('Nodequeue'),
++    'variables' => array(
++      'nodequeue' => array(
++        'label' => t('Changed nodequeue'),
++        'type' => 'nodequeue',
++      ),
++      'nodes' => array(
++        'label' => t('Nodes'),
++        'type' => 'nodes'
++      ),
++    )
++  );
++
++  $items['nodequeue_node_changed'] = array(
++    'label' => t('A nodequeue\'s node has been updated'),
++    'group' => t('Nodequeue'),
++    'variables' => $vars,
++  );
++
++  return $items;
++}
++
++/**
++ * Implementation of hook_rules_data_type_info().
++ *
++ * We define a nodequeue data type to be used as a ruleset argument.
++ */
++function nodequeue_rules_data_info() {
++  return array(
++    'nodequeue' => array(
++      'label' => 'nodequeue',
++      'wrap' => FALSE,
++      'wrapper class' => 'NodequeueRulesDataWrapper'
++    ),
++    'nodes' => array(
++      'label' => 'nodes',
++      'wrap' => FALSE,
++      'wrapper class' => 'NodeIdArrayRulesDataWrapper',
++    ),
++  );
++}
++
++/**
++ * Defines rules data wrapper for nodequeue type.
++ */
++class NodequeueRulesDataWrapper extends RulesIdentifiableDataWrapper {
++
++  protected function extractIdentifier($nodequeue) {
++    $nodequeue = current($nodequeue);
++    return $nodequeue->qid;
++  }
++
++  protected function load($sqid){
++    return nodequeue_load_subqueue($sqid);
++  }
++
++}
++
++/**
++ * Defines rules data wrapper for array of node nids.
++ */
++class NodeIdArrayRulesDataWrapper extends RulesIdentifiableDataWrapper {
++
++  protected function extractIdentifier($rules_node_data) {
++    // Check whether we have an array of nids or just a node object
++    if (is_array($rules_node_data)) {
++      $nids = array();
++      foreach ($rules_node_data as $node_data) {
++        $nids[] = $node_data['nid'];
++      }
++      return $nids;
++    }
++    else {
++      return $rules_node_data;
++    }
++
++  }
++
++  protected function load($nids) {
++    if (is_array($nids)) {
++      $nodes = array();
++      foreach ($nids as $nid) {
++        $nodes[] = node_load($nid);
++      }
++      return $nodes;
++    }
++    // We have a loaded node object
++    else {
++      $node = $nids;
++      return $nids;
++    }
++  }
++}
++
++/**
++ * Implementation of hook_rules_condition_info().
++ *
++ * As we have generic events, e. g. node added to nodequeue,
++ * we might also want to identify and filter by certain nodequeues.
++ */
++function nodequeue_rules_condition_info() {
++  $conditions = array();
++
++  $conditions['nodequeue_rules_condition_belongs_to_nodequeue'] = array(
++    'label' => t('Belongs to Nodequeue(s)'),
++    'group' => t('Nodequeue'),
++    'parameter' => array(
++      'nodequeue' => array(
++        'type' => 'nodequeue',
++        'label' => t('Nodequeue'),
++      ),
++      'qid' => array(
++        'type' => 'list<text>',
++        'label' => t('Queue ID of nodequeue to check'),
++        'options list' => 'nodequeue_rules_qid_options_list',
++        'multiple' => TRUE,
++      ),
++    ),
++  );
++  $conditions['nodequeue_rules_condition_node_belongs_to_nodequeue'] = array(
++    'label' => t('Node Belongs to Nodequeue(s)'),
++    'group' => t('Nodequeue'),
++    'parameter' => array(
++      'node' => array(
++        'type' => 'node',
++        'label' => t('Node'),
++      ),
++      'qids' => array(
++        'type' => 'list<text>',
++        'label' => t('Queue ID(s) of nodequeue to check'),
++        'options list' => 'nodequeue_rules_qid_options_list',
++        'multiple' => TRUE,
++      ),
++    ),
++  );
++
++  return $conditions;
++}
++
++/**
++ * Helper function for rules condition options list
++ */
++function nodequeue_rules_qid_options_list() {
++  $queues = nodequeue_load_subqueues_by_queue(array_keys(nodequeue_get_all_qids()));
++  foreach ($queues as $sqid => $queue) {
++    $queuenames[$sqid] = $queue->title;
++  }
++  return $queuenames;
++}
++
++/**
++ * The condition verifies if the provided nodequeue argument is contained within the configured nodequeues.
++ *
++ * @param $nodequeue
++ *   nodequeue (subqueue) object
++ * @param $qid
++ *   list of nodequeue ID's
++ * @return boolean
++ *   boolean indicating whether the conditions applies
++ */
++function nodequeue_rules_condition_belongs_to_nodequeue($nodequeue, $qid) {
++  if (in_array($nodequeue->qid, $qid)) {
++    return TRUE;
++  }
++  else {
++    return FALSE;
++  }
++}
++
++/**
++ * The condition verifies if the provided nodequeue argument is contained within the configured nodequeues.
++ *
++ * @param $nodequeue
++ *   nodequeue (subqueue) object
++ * @param $qid
++ *   list of nodequeue ID's
++ * @return boolean
++ *   boolean indicating whether the conditions applies
++ */
++function nodequeue_rules_condition_node_belongs_to_nodequeue($node, $qids) {
++  $queues = nodequeue_load_queues(array_keys($qids));
++  $nodesqueues = nodequeue_get_subqueues_by_node($queues, $node);
++  if (!empty($nodesqueues)) {
++    return TRUE;
++  }
++  else {
++    return FALSE;
++  }
++}

@@ -1,0 +1,137 @@
+/* line 1, ../sass/print.scss */
+body {
+  margin: 1em;
+  background-color: #fff;
+  font-family: sans-serif;
+}
+
+/* line 6, ../sass/print.scss */
+th {
+  text-align: left;
+  /* LTR */
+  color: #006;
+  border-bottom: 1px solid #ccc;
+}
+
+/* line 11, ../sass/print.scss */
+tr.odd {
+  background-color: #ddd;
+}
+
+/* line 12, ../sass/print.scss */
+tr.even {
+  background-color: #fff;
+}
+
+/* line 13, ../sass/print.scss */
+td {
+  padding: 5px;
+}
+
+/* line 14, ../sass/print.scss */
+#menu {
+  visibility: hidden;
+}
+
+/* line 15, ../sass/print.scss */
+#main {
+  margin: 1em;
+}
+
+/* line 16, ../sass/print.scss */
+a:link {
+  color: #000;
+}
+
+/* line 17, ../sass/print.scss */
+a:visited {
+  color: #000;
+}
+
+/* line 18, ../sass/print.scss */
+a:hover {
+  color: #00f;
+}
+
+/* line 19, ../sass/print.scss */
+a:link img, a:visited img {
+  border: 0;
+}
+
+/* line 20, ../sass/print.scss */
+.print-footnote {
+  font-size: xx-small;
+}
+
+/* line 22, ../sass/print.scss */
+img.print-logo {
+  border: 0;
+}
+
+/* line 25, ../sass/print.scss */
+.print-breadcrumb {
+  font-size: x-small;
+}
+
+/* line 27, ../sass/print.scss */
+.print-submitted {
+  font-size: small;
+}
+
+/* line 28, ../sass/print.scss */
+.print-created {
+  font-size: small;
+}
+
+/* line 29, ../sass/print.scss */
+.print-taxonomy {
+  text-align: right;
+}
+
+/* line 30, ../sass/print.scss */
+.print-taxonomy li {
+  display: inline;
+}
+
+/* line 32, ../sass/print.scss */
+.print-hr {
+  border: 0;
+  height: 1px;
+  width: 100%;
+  color: #9E9E9E;
+  background-color: #9E9E9E;
+}
+
+/* line 39, ../sass/print.scss */
+.print-message {
+  border: medium dotted blue;
+  padding: 1em;
+}
+
+/* line 43, ../sass/print.scss */
+.print-source_url {
+  font-size: small;
+}
+
+/* line 44, ../sass/print.scss */
+.print-links {
+  font-size: small;
+}
+
+/* line 45, ../sass/print.scss */
+.print-footer {
+  text-align: center;
+}
+
+/* line 48, ../sass/print.scss */
+.print-content .pane-application-pdf-button {
+  display: none;
+}
+/* line 53, ../sass/print.scss */
+.print-content .crm-core-activity-yolo-application h2 {
+  display: none;
+}
+/* line 60, ../sass/print.scss */
+.print-content .field-items .field-item p {
+  margin: 0;
+}

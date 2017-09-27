@@ -1,0 +1,5 @@
+name = Trip Administration
+description = "Online system for managing trip application, selection, and
+assignment processes like Alternative Spring Break."
+core = 7.x
+version = 7.x-0.1

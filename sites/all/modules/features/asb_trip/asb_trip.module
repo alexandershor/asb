@@ -1,0 +1,153 @@
+<?php
+/**
+ * @file
+ * Code for the ASB Trip feature.
+ */
+
+include_once 'asb_trip.features.inc';
+
+define('ASB_TRIP_SEND_EMAIL_ACTION_LABEL', 'SEND_EMAIL_TO_APPLICANT');
+
+/**
+ * Implements hook_webform_submission_insert().
+ */
+/*function asb_trip_webform_submission_insert($webform_node, $submission) {
+
+  // Find referencing entity (trip node).
+  $query = new EntityFieldQuery();
+  $query->entityCondition('entity_type', 'node')
+    ->entityCondition('bundle', 'trip')
+    ->propertyCondition('status', 1)
+    ->fieldCondition('field_trip_questions', 'target_id', $webform_node->nid);
+  $result = $query->execute();
+
+  if (isset($result['node'])) {
+    $nid = reset($result['node'])->nid;
+    $trip_node = node_load($nid);
+
+    // The ID of the action is permanent but may differ across environments.
+    $action_id = db_query('SELECT aid FROM {actions} WHERE label = ?', array(ASB_TRIP_SEND_EMAIL_ACTION_LABEL))
+      ->fetchField();
+
+    if ($action_id) {
+      // Pass trip node as action object to supply email with node tokens.
+      actions_do($action_id, $trip_node, array());
+    }
+
+  }
+
+}*/
+
+/**
+ * Implements hook_menu().
+ */
+/*function asb_trip_menu() {
+  $items['node/%node/applications'] = array(
+    'title' => 'Applications',
+    'page callback' => 'asb_trip_applications',
+    'page arguments' => array(1, 'trip_applications'),
+    'access callback' => 'node_access',
+    'access arguments' => array('view', 1),
+    'weight' => 0,
+    'type' => MENU_LOCAL_TASK,
+    'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+  );
+  $items['node/%node/results'] = array(
+    'title' => 'Results',
+    'page callback' => 'asb_trip_applications',
+    'page arguments' => array(1, 'sasb_confirmed_appications'),
+    'access callback' => 'node_access',
+    'access arguments' => array('view', 1),
+    'weight' => 0,
+    'type' => MENU_LOCAL_TASK,
+    'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+  );
+  return $items;
+}
+*/
+/**
+ * Display list of applications for a given trip node.
+ *
+ * We cannot use views relationships directly because webform module
+ * always expects that the first argument of the view is webform node.
+ *
+ * @see webform_views_pre_view().
+ */
+/*function asb_trip_applications($node, $view_name) {
+  $question_nid = empty($node->field_trip_questions[LANGUAGE_NONE][0]['target_id']) ?
+    NULL : $node->field_trip_questions[LANGUAGE_NONE][0]['target_id'];
+  $build['#markup'] = views_embed_view($view_name, 'default', $question_nid);
+  return $build;
+}*/
+
+/**
+ * Implements hook_views_query_alter().
+ */
+/*function asb_trip_views_query_alter(&$view, &$query) {
+
+  // Web form does not have views integration form submitted data.
+  // So we have add some conditions to the results view manually.
+  if ($view->name == 'sasb_confirmed_appications') {
+    $submitted_data_join = new views_join;
+    $submitted_data_join->construct('webform_submitted_data', 'webform_submissions', 'sid', 'sid');
+    $query->add_relationship('webform_submitted_data', $submitted_data_join, 'webform_submitted_data');
+
+    $component_join = new views_join;
+    $component_join->construct('webform_component', 'webform_submitted_data', 'cid', 'cid');
+    $query->add_relationship('webform_component', $component_join, 'webform_component');
+
+    $query->add_where_expression(0, 'webform_submitted_data.nid = webform_component.nid');
+    $query->add_where(0, 'webform_component.form_key', 'accepted');
+    $query->add_where(0, 'webform_submitted_data.data', 'yes');
+  }
+
+}*/
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function asb_trip_form_trip_application_node_form_alter(&$form, &$form_state, $form_id) {
+  global $user;
+  if (isset($_GET['field_tripapp_trip'])){
+
+    $node = node_load($_GET['field_tripapp_trip']);
+
+    //Grab custom question from node
+
+    if(isset($node->field_asb_custom_question[LANGUAGE_NONE][0]['safe_value'])){
+
+      $custom_question = $node->field_asb_custom_question[LANGUAGE_NONE][0]['safe_value'];
+
+      // Set value of field_answer to custom question from Trip
+      $form['field_answer']['und']['#title'] = $custom_question;
+      $form['field_answer']['und'][0]['#title'] = $custom_question;
+      $form['field_answer']['und'][0]['value']['#title'] = $custom_question;
+    }
+
+  }
+
+  $roles = array(11,13,15,16);
+  $role_keys = array_keys($user->roles);
+  $matches = array_intersect($roles, $role_keys);
+
+  if (empty($matches)) {
+    $form['field_tripapp_appro']['#access'] = FALSE;
+    $form['field_tripapp_trip']['#access'] = FALSE;
+    $form['field_tripapp_rank']['#access'] = FALSE;
+    $form['field_tripapp_paid']['#access'] = FALSE;
+    $form['field_tripapp_status']['#access'] = FALSE;
+    $form['upload']['#access'] = FALSE;
+
+  }
+
+}
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,108 @@
+/**
+ * @file
+ * Styles are organized using the SMACSS technique. @see http://smacss.com/book/
+ *
+ * When you turn on CSS aggregation at admin/config/development/performance, all
+ * of these @include files will be combined into a single file.
+ */
+/* Import Sass mixins, variables, Compass modules, etc. */
+/* Components */
+/**
+ * Styles for blocks.
+ */
+/**
+ * Styles for forms.
+ */
+/**
+ * Styles for header.
+ */
+/**
+ * Styles for blocks.
+ */
+/* line 5, ../sass/components/_misc.scss */
+.program.span6 {
+  padding: .5em;
+  margin: 10px 10px 10px 0px;
+  border: solid 1px #ddd;
+  height: 200px;
+}
+/* line 10, ../sass/components/_misc.scss */
+.program.span6:hover {
+  background: #f2f1eb;
+}
+
+/* line 14, ../sass/components/_misc.scss */
+div#block-views-news-items-block-4 {
+  border-left: 1px solid #ddd;
+  border-right: 1px solid #ddd;
+  padding-left: 20px;
+}
+
+/**
+ * Front Page Carousel
+ */
+/* line 24, ../sass/components/_misc.scss */
+.carousel-caption.stanford-carousel-text {
+  color: #cfcfcd;
+  padding: 20px 75px 25px 25px;
+  width: 300px;
+  line-height: 1.4em;
+  left: auto;
+  right: 0;
+  bottom: 0px;
+}
+
+/* line 34, ../sass/components/_misc.scss */
+.slide-body {
+  letter-spacing: 0.02em;
+  line-height: 1.4em;
+  font-size: 17px;
+}
+
+/* line 40, ../sass/components/_misc.scss */
+h2.slide-title {
+  font-size: 40px;
+}
+
+/* line 44, ../sass/components/_misc.scss */
+.views-field-field-frontpage-image img {
+  width: 1170px;
+  max-width: 100%;
+}
+
+/* line 49, ../sass/components/_misc.scss */
+.carousel-control {
+  z-index: 9000;
+  top: 50%;
+}
+
+/* line 54, ../sass/components/_misc.scss */
+span.icon-next {
+  line-height: inherit;
+  padding-left: 5px;
+}
+
+/* line 59, ../sass/components/_misc.scss */
+span.icon-prev {
+  line-height: inherit;
+  padding-right: 5px;
+}
+
+/* line 64, ../sass/components/_misc.scss */
+.view-news-items {
+  display: none;
+}
+
+/**
+ * Main Menu
+ */
+/* line 73, ../sass/components/_misc.scss */
+#main-menu {
+  margin-bottom: 0px;
+}
+
+/* line 78, ../sass/components/_misc.scss */
+.view-display-id-page_application_info .views-label {
+  display: block;
+  font-weight: bold;
+}

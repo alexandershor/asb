@@ -1,0 +1,63 @@
+Version 7.x-2.2
+------------------------------
+by hyperboy: Reverted the removal of https in google web font references
+
+Version 7.x-2.1
+------------------------------
+by hyperboy: Removed https in google web font references
+by hyperboy: Updated theme description in .info file
+by hyperboy: Revised method for displaying site title (2nd line) below site logo image
+by hyperboy: Changed site name section width from span8 to span9 when search box is present
+by meganem: Updating mobile placement of sunet login (top menu). It was touching the bottom of the red bar before.
+by hyperboy: Updated header name and slogan display in mobile
+by sherakama: added project URL to .info
+by hyperboy: removed top and bottom margin in header content div
+by meganem: changing banner overlay position
+by meganem: hardcoding font styles into global brand bars
+by hyperboy: fixed premature wrapping of name and slogan in Chrome
+by hyperboy: udpated Stanford favicon
+by hyperboy: added header section class for header table display
+by sherakama: added project variable to .info to fix undefined index error on update status page
+by meganem: Removing site title font size change at tablet breakpoint
+by hyperboy: Fix so that blocks in header region do not show between first and second line of title
+by hyperboy: Remove duplicate nested container div in navbar
+by hyperboy: Updated more-link style to not use an image
+by hyperboy & Aaron Cole: Set skip links to point to correct regions
+by hyperboy: Made main menu "hamburger" button keyboard accessible
+by meganem: Adjusted site title lockup styles to more accurately match Stanford idenitity guidelines
+by meganem: Updated global footer to reflect current links and styles in Stanford identity toolkit
+by meganem: Added red button styles and arrow button styles
+by meganem: Removed top margin from headers inside banner-overlay captions
+by meganem: Removed blue color from links and pills in focus state
+by meganem: Added responsive style for global footer at smallest breakpoint
+by meganem: Added focus indicators to links in global brand bars
+by meganem: Added custom blockquote color to override Bootstrap's default
+by meganem: Moved views-row-lines styles to OFW, added color override
+by hyperboy: Updated font family in admin shortcuts for cross-browser compatibility
+by meganem: Added style overrides for Stanford Carousel feature
+by meganem: Fixed banner-overlay position
+by meganem: Fixed views-row-lines height bug
+by meganem: Adjusted styles in sidebar menus
+
+Version 7.x-2.03
+------------------------------
+by meganem: Fixed typo on main menu margins
+
+Version 7.x-2.02
+------------------------------
+by meganem: Fixed main menu desktop and mobile padding and margins
+
+Version 7.x-2.01
+------------------------------
+by hyperboy: Added accessibility improvements to skip navigation links
+by meganem: Added support for content styles to show in WYSIWYG preview
+by meganem: Added "active-trail" styles for nested menu items
+by meganem: Updated mobile display of site titles first and second line content
+by meganem: Made it harder to accidentally change Stanford brand bar styles
+by meganem: Miscellaneous styles cleanup on menus, block elements, and pager
+by meganem: Changed all instances of bold to font-weight:600; for cross-browser support
+by meganem: Updated styles on Admin Shortcuts region
+
+Version 7.x-2.0
+------------------------------
+by hyperboy: Initial Release

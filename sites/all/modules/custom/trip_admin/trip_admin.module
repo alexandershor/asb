@@ -1,0 +1,476 @@
+<?php
+
+/**
+ * @file
+ * Provides online application, selection, and assignment functions
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+function trip_admin_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#trip_admin':
+      $output = '<p>' . t('Provides online application functions including the online application, the ability for trip leaders to rank applicants, and the ability to sort applicants into trips based on applicant and trip leader rankings.') . '</p>';
+    return $output;
+  }
+}
+
+/**
+ * Implementation of hook_permission().
+ */
+function hook_permission() {
+  return array(
+    'administer all application processes' => array(
+      'title' => t('Administer all application processes'),
+      'description' => t('Perform administration all application processes.'),
+    ),
+
+  );
+}
+/**
+ * Implementation of hook_form_alter().
+ */
+function trip_admin_form_alter(&$form, &$form_state, $form_id) {
+
+  if($form_id == 'views_form_applications_page_1'){
+    $form['actions']['submit']['#submit'][] = '_trip_admin_update_ranks_submit';
+  }
+
+}
+
+function trip_admin_node_access($node, $op, $account) {
+  $type = is_string($node) ? $node : $node->type;
+  if ($type == 'trip_application' && ($op == 'create')) {
+    if(!in_array('admin', $GLOBALS['user']->roles)
+      && !in_array('trip program director', $GLOBALS['user']->roles)
+      && !in_array('Stanford Staff', $GLOBALS['user']->roles)
+      && !in_array('Stanford Faculty', $GLOBALS['user']->roles)
+      ){
+
+      if(!isset($_GET['field_tripapp_appro'])){
+        return NODE_ACCESS_DENY;
+      }
+
+      $result = db_select('node', 'n')
+            ->fields('n')
+            ->condition('n.type','trip_application','=')
+            ->condition('n.uid',$GLOBALS['user']->uid,'=');
+
+      $result->join('field_data_field_tripapp_appro', 'f', 'f.bundle = n.type AND f.entity_id = n.nid');
+      $result->condition('f.field_tripapp_appro_target_id',$_GET['field_tripapp_appro'],'=');
+
+
+      $result = $result->execute();
+      $num_of_results = $result->rowCount();
+      if($num_of_results >= 3){
+       return NODE_ACCESS_DENY;
+      }
+    }
+
+  }
+
+  return NODE_ACCESS_IGNORE;
+}
+
+
+function _trip_admin_update_ranks_submit(&$form, &$form_state){
+
+  foreach($form_state['values']['draggableviews'] as $item){
+    $node = node_load($item['id']);
+    $node->field_tripapp_rank['und'][0]['value'] = $item['weight'] + 1;
+    node_save($node);
+  }
+}
+
+
+
+
+/**
+ * Implementation of hook_menu().
+ */
+
+function trip_admin_menu() {
+
+  $items['node/%node/trips'] = array(
+    'title' => t("Trips"),
+    'description' => t("View trips for this application process."),
+    'access callback' => '_trip_admin_local_tasks',
+    'access arguments' => array(1, 'trips'),
+    'page callback' => 'trip_admin_apppro_trips',
+    'page arguments' => array(1),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 3,
+  );
+
+  $items['node/%node/sort'] = array(
+    'title' => t("Sort"),
+    'description' => t("Sort applicants into trips."),
+    'access callback' => '_trip_admin_local_tasks',
+    'access arguments' => array(1, 'sort'),
+    'page callback' => 'trip_admin_apppro_sort',
+    'page arguments' => array(1),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 5,
+  );
+
+
+  return $items;
+}
+
+/**
+ * Custom access control for local tasks based on node type
+ */
+function _trip_admin_local_tasks($node, $task) {
+  global $user;
+
+  switch ($node->type) {
+    case 'app_process':
+      switch ($task) {
+        case 'sort':
+        case 'trips':
+          if (user_access('administer all application processes')) {
+            return TRUE;
+          }
+        default:
+          return FALSE;
+      }
+      break;
+    default:
+      return FALSE;
+  }
+}
+
+
+function trip_admin_apppro_trips($node) {
+  $trips = views_get_view('trips_for_app_process');
+  $trips->set_arguments(array($node->nid));
+  $trips_output = $trips->preview();
+  $trips_data = $trips->result;
+  $output = '';
+  $output .= '<p>' . l('Create a new trip', 'node/add/trip') . '</p>';
+
+  if ($trips_data) {
+    $output .= "<p>Below are the trips associated with this application
+      process.</p>";
+    $output .= $trips_output;
+  }
+  else {
+    $output .= t('<p>There are no trips yet for this application
+    process.</p>');
+  }
+
+  return $output;
+}
+
+function trip_admin_apppro_sort($apppro) {
+
+  $fied_status = field_get_items('node',$apppro,'field_apppro_status');
+
+  if ($fied_status[0]['value'] != 'closed') {
+    $output .= t('Applications and/or ranking for this application
+      process are currently open.  They both must be closed in order to sort
+      applicants into trips.  Please close them by selecting the <em>edit</em>
+      tab above and try again.');
+  }
+  else {
+    $output .= t('<p>This process will sort the applicants into trips.  After this
+      process runs, you will be able to manually review and edit trip rosters.  You
+       may run this process multiple times if for some reason a sort does not work out.
+      <strong>If you have already run the sorting process for
+      this application process and are running it again, please be aware that
+      any manual rearrangements you made to the trip rosters or waitlists
+      will be lost.</strong></p>');
+    $output .= t('<p><strong>Please confirm that all leaders have entered their rankings!
+    If a leader has not entered any rankings, they will be assigned no participants.</strong>
+    If a leader has not entered rankings before you run the sort, open the ranking again,
+    have the leader enter rankings, and then re-run the sort.');
+    $output .= t('<p>Please review the settings for this application process one
+      more time before running the sort.  If you need to make any changes, select
+      the <em>edit</em> tab above.</p>');
+    $output .= drupal_render(node_view($apppro));
+    $output .= '<p>Sorting may take a minute or two.  Would you like to continue?</p>';
+    $output .= drupal_render(drupal_get_form('_trip_admin_apppro_sort_form', $apppro->nid));
+  }
+
+  return($output);
+}
+
+function _trip_admin_apppro_sort_form($form, &$form_state, $apppro_nid) {
+
+  $form['apppro_nid'] = array(
+    '#type' => 'value',
+    '#value' => $apppro_nid,
+  );
+
+  $form['yes'] = array(
+    '#type' => 'submit',
+    '#value' => t('Yes'),
+    '#prefix' => '<div class="container-inline">',
+  );
+
+  $form['no'] = array(
+    '#type' => 'submit',
+    '#value' => t('No'),
+    '#suffix' => '</div>',
+  );
+
+  return $form;
+}
+
+
+function _trip_admin_apppro_sort_form_submit($form, &$form_state) {
+  if ($form_state['clicked_button']['#value'] == 'Yes') {
+    $apppro_nid = $form_state['values']['apppro_nid'];
+
+    $accepted_table = $apppro_nid . "_applicants_accepted";
+    $data_table = $apppro_nid . "_applicants_data";
+
+    _trip_admin_apppro_sort_tables($apppro_nid, $data_table, $accepted_table);
+    _trip_admin_apppro_sort_sort($apppro_nid, $data_table, $accepted_table);
+    _trip_admin_apppro_sort_waitlist($apppro_nid, $data_table);
+    batch_set(_trip_admin_apppro_sort_save($apppro_nid, $data_table));
+  }
+  else {
+    drupal_set_message(t('Sorting was not performed.'));
+  }
+}
+
+
+function _trip_admin_apppro_sort_tables($apppro_nid, $data_table, $accepted_table) {
+  //create a temporary table to store applicants for the current
+  //process given a rank.  If they weren't ranked by any leader, they definitely
+  //won't be accepted.
+  db_query("DROP TABLE {$accepted_table}");
+  db_query("DROP TABLE {$data_table}");
+
+  $success = db_query("CREATE TABLE {$accepted_table}
+    (`tripapp_nid` int(10), `uid` int(10), `trip_nid` int(10), `preference` int(2), `rank` int(2))");
+
+  //create another temporary table to store the data from the nodes and
+  //set accepted status for everyone for current year to be 0.  This avoids
+  //using a billion node_load and node_save calls.
+  $success = db_query("CREATE TABLE {$data_table}
+    (`tripapp_nid` int(10), `uid` int(10), `trip_nid` int(10), `preference` int(2), `rank` int(2), `accepted` tinyint(1) default 0, `waitlisted` tinyint(1) default 0)");
+
+  $tripapps = views_get_view('tripapps_for_apppro');
+  $tripapps->set_arguments(array($apppro_nid));
+  $tripapps->preview();
+  $tripapps_data = $tripapps->result;
+
+  foreach ($tripapps_data as $tripapp) {
+    $trip = isset($tripapp->field_field_tripapp_trip[0]['raw']['target_id']) ? $tripapp->field_field_tripapp_trip[0]['raw']['target_id'] : "0";
+    $pref = isset($tripapp->field_field_tripapp_pref[0]['raw']['value']) ? $tripapp->field_field_tripapp_pref[0]['raw']['value'] : "0";
+    $rank = isset($tripapp->field_field_tripapp_rank[0]['raw']['value']) ? $tripapp->field_field_tripapp_rank[0]['raw']['value'] : "0";
+    $data_insert_substring .= "(" .
+      $tripapp->nid . "," .
+      $tripapp->node_uid . "," .
+      $trip . "," .
+      $pref . "," .
+      $rank . "),\n";
+    if ($rank > 0) {
+      $accepted_insert_substring .= "(" .
+        $tripapp->nid . "," .
+        $tripapp->node_uid . "," .
+        $trip . "," .
+        $pref . "," .
+        $rank . "),\n";
+    }
+  }
+
+  $accepted_insert_substring = substr($accepted_insert_substring,0,-2);
+  $data_insert_substring = substr($data_insert_substring,0,-2);
+
+  if ($accepted_insert_substring) {
+    $success = db_query("INSERT INTO {$accepted_table}
+      (`tripapp_nid`, `uid`, `trip_nid`, `preference`, `rank`) VALUES
+      $accepted_insert_substring");
+  }
+  if ($data_insert_substring) {
+    $success = db_query("INSERT INTO {$data_table}
+      (`tripapp_nid`, `uid`, `trip_nid`, `preference`, `rank`) VALUES
+      $data_insert_substring");
+  }
+
+
+  $num_entries = db_query("SELECT COUNT(*) as count FROM {$accepted_table}")->fetchField();
+  if (!$num_entries) {
+    db_query("DROP TABLE {$accepted_table}");
+    db_query("DROP TABLE {$data_table}");
+    drupal_set_message(t('There are either no applications or no rankings!  Please ensure that there are both applications and rankings before running the sort.'), 'error');
+    drupal_goto('node/' . $apppro_nid . '/sort');
+  }
+}
+
+function _trip_admin_apppro_sort_sort($apppro_nid, $data_table, $accepted_table) {
+  //delete all except the applicant's top preference trip for which
+  //she or he was ranked
+  $previous_uid = 0;
+  $applications = db_query("SELECT `uid`, `preference` FROM {$accepted_table} ORDER BY `uid`, `preference`");
+  foreach ($applications as $application ) {
+    if ($application->uid == $previous_uid) {
+      //remove this application because applicant exists in the table
+      //for a higher preference trip.
+      $success = db_query("DELETE FROM {$accepted_table}
+        WHERE `uid` = :uid AND
+	`preference` = :pre",array(':uid' => $application->uid, ':pre' => $application->preference));
+    }
+    $previous_uid = $application->uid;
+  }
+
+
+
+  //tentatively assign all applicants to the top trip for which they were ranked.
+  $success = db_query("UPDATE {$data_table}, {$accepted_table} SET {$data_table}.`accepted` = '1'
+    WHERE {$accepted_table}.`uid` = {$data_table}.`uid`
+    AND {$accepted_table}.`trip_nid` = {$data_table}.`trip_nid`");
+
+
+  $moved = 1;
+  $trips = views_get_view('trips_data_for_app_process');
+  $trips->set_arguments(array($apppro_nid));
+  $trips->preview();
+  $trips_data = $trips->result;
+
+  while ($moved > 0) {
+    $moved = 0;
+    foreach ($trips_data as $trip) {
+      // how many do we have for this trip?
+      $num_applicants = db_query("SELECT COUNT(`uid`) as count FROM
+				        {$accepted_table} WHERE `trip_nid` = :tnid",
+				         array(':tnid' => $trip->nid))
+				      	->fetchField();
+      $num_participants = $trip->field_field_trip_num_participants[0]['raw']['value'];
+      if ($num_applicants > $num_participants){
+      	$dif = $num_applicants - $num_participants;
+        // order by rank and move the ones we can't take.
+        $leftovers = db_query("SELECT * FROM {$accepted_table}
+          WHERE `trip_nid` = :tnid ORDER BY `rank` LIMIT $num_participants, $dif",
+          array(':tnid'=> $trip->nid));
+
+        foreach ($leftovers as $leftover) {
+          $moved++;
+          // set the accepted = 0 for this trip
+          $success = db_query("UPDATE {$data_table} SET `accepted` = 0
+            WHERE `uid` = :uid AND `trip_nid` = :tnid",
+            array(':uid' => $leftover->uid, ':tnid' => $leftover->trip_nid));
+	  		// remove this entry from the temporary accepted applications table
+          $success = db_query("DELETE FROM {$accepted_table}
+            WHERE `uid` = :uid AND `trip_nid` = :tnid",
+            array(':uid' => $leftover->uid, ':tnid' => $leftover->trip_nid));
+
+          // check to see if the "leftover" person has another ranked application.
+		  // if so, temporarily assign them to that trip
+		  // if not, they are sadly not accepted to a trip at all this year
+          $next_application = db_query("SELECT * FROM {$data_table}
+            WHERE `uid` = :uid AND `preference` > :pref AND `rank` > 0
+            ORDER BY `preference` LIMIT 1",
+            array(':uid' => $leftover->uid, ':pref' => $leftover->preference))->fetchObject();
+
+          if ($next_application) {
+            $success = db_update($data_table)
+					  ->fields(array('accepted' => 1))
+					  ->condition('uid', $next_application->uid, '=')
+					  ->condition('trip_nid', $next_application->trip_nid, '=')
+					  ->execute();
+            $success = db_insert($accepted_table)
+						->fields(array(
+						  'uid' => $next_application->uid,
+						  'trip_nid' => $next_application->trip_nid,
+						  'preference' => $next_application->preference,
+						  'rank' => $next_application->rank
+						))
+						->execute();
+          }
+        }
+      }
+    }
+  }
+  db_query("DROP TABLE {$accepted_table}");
+}
+
+function _trip_admin_apppro_sort_waitlist($apppro_nid, $data_table) {
+  $apppro_node = node_load($apppro_nid);
+  $fied_waitlist = field_get_items('node',$apppro_node,'field_apppro_waitlist_size');
+  $trips = db_query("SELECT DISTINCT `trip_nid` FROM {$data_table} WHERE `accepted` != 1");
+
+  foreach ($trips as $trip) {
+    $tripapps = db_query("SELECT * FROM {$data_table}
+      WHERE `trip_nid` = :tnid AND `rank` > 0
+      AND `uid` NOT IN
+        (SELECT `uid` FROM {$data_table} WHERE `accepted` = '1')
+      ORDER BY `rank` LIMIT {$fied_waitlist[0]['value']}", array( ':tnid' => $trip->trip_nid));
+
+    foreach ($tripapps as $tripapp) {
+      $success =  db_update($data_table)
+      			  ->fields(array('waitlisted' => 1))
+      			  ->condition('tripapp_nid', $tripapp->tripapp_nid, '=')
+      			  ->execute();
+    }
+  }
+}
+
+function _trip_admin_apppro_sort_save($apppro_nid, $data_table) {
+  $operations = array();
+  $operations[] = array('_trip_admin_apppro_sort_save_batch', array($apppro_nid, $data_table));
+  $batch = array(
+    'operations' => $operations,
+    'finished' => '_trip_admin_apppro_sort_finished',
+    'title' => t('Processing Sort Save'),
+    'init_message' => t('Save is starting.'),
+    'progress_message' => t('Completed @current out of @total task(s).'),
+    'error_message' => t('Some records were unable to be saved.'),
+  );
+  return $batch;
+}
+
+function _trip_admin_apppro_sort_save_batch($apppro_nid, $data_table, &$context) {
+  if (!isset($context['sandbox']['progress'])) {
+    $context['sandbox']['progress'] = 0;
+    $context['sandbox']['current_row'] = 0;
+    $context['sandbox']['max'] = db_query("SELECT COUNT(DISTINCT `tripapp_nid`) as count FROM {$data_table}")->fetchField();
+  }
+  $limit = 100;
+
+  $revised_tripapps_data = db_query_range("SELECT `tripapp_nid`,
+  `accepted`, `waitlisted` FROM {$data_table} ORDER BY `tripapp_nid`",
+  $context['sandbox']['current_row'], $limit);
+
+  foreach ($revised_tripapps_data as $revised_tripapp) {
+     $status = 'Rejected';
+    if ($revised_tripapp->accepted) {
+      $status = 'Accepted';
+    }
+    else if ($revised_tripapp->waitlisted) {
+      $status = 'Waitlisted';
+    }
+
+    $tripapp_node = node_load($revised_tripapp->tripapp_nid, NULL, TRUE);
+    $tripapp_node->field_tripapp_status['und'][0]['value'] = $status;
+    node_save($tripapp_node);
+
+
+    $tripapp_node = node_load($tripapp->nid, NULL, TRUE);
+    // Update our progress information.
+    $context['sandbox']['progress']++;
+    $context['sandbox']['current_row']++;
+    $context['message'] = t('Saving record @record of @max_records',
+    array('@record' => $context['sandbox']['current_row'],
+    '@max_records' => $context['sandbox']['max']));
+  }
+  $context['results'] = $data_table;
+
+  if ($context['sandbox']['progress'] < $context['sandbox']['max']) {
+    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+  }
+}
+
+function _trip_admin_apppro_sort_finished($success, $results, $operations) {
+  db_query("DROP TABLE " . $results);
+
+  drupal_set_message(t('The applicants have been sorted into trips and
+    waitlists built.  You may view all applicants for all trips by
+    selecting the <em>Roster Admin</em> tab above.  You may also view
+    applicants for a specific trip by selecting the trip from the
+    <em>Trips</em> tab above and selecting its <em>Roster</em> tab.'));
+}
