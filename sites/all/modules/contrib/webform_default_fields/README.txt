@@ -36,8 +36,8 @@ CONFIGURATION
      management page. Generally an administrative permission.
 
    - Reset Webform components to Default
-     Users with roles with the "Reset Webform components to Default" 
-     permission will see the "Reset" page on all webform content. 
+     Users with roles with the "Reset Webform components to Default"
+     permission will see the "Reset" page on all webform content.
 
  * Create default fields for the webform content type:
    
@@ -52,13 +52,23 @@ CONFIGURATION
    - Create a new webform node and make sure it contains default fields
      you added before.
 
+ * Configure exclusions for the Webform Default Fields
+
+   - Go to /admin/structure/types/manage/%WEBFORM_ALLOWED_TYPE% in the tab
+     "Webform" Webform default fields allowing for content type, to disable
+     action when create a new node.
+
+   - If you use hook_webform_node_defaults_alter() and don't want Webform
+     Default Fields to overwrite the your defaults in $node->webform, you should
+     add $defaults['webform_default_fields_ignore'] = TRUE in your implementing.
+
  * Reset existing webform to default:
 
    - Go to %YOUR_NODE%/webform/webform-reset where %WEBFORM_NODE% is ID of node
      which you want to reset
 
    - Reset components of webform implemented in "reset components" form. Check
-     out a difference between components the curent webform and default webform. 
+     out a difference between components the curent webform and default webform.
      Select which components expose to reset actions (add / remove / restore).
 
    - Reset main webform parts implemented in "global reset" form.

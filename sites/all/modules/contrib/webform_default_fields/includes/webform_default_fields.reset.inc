@@ -1,5 +1,10 @@
 <?php
 
+/**
+ * Theming webform components page.
+ * @param object $node
+ * @return array
+ */
 function webform_default_fields_reset($node) {
   $output = drupal_get_form('webform_default_fields_reset_components_form', $node);
   return array(
@@ -9,6 +14,13 @@ function webform_default_fields_reset($node) {
   );
 }
 
+/**
+ * Form with default components webform.
+ * @param array $form
+ * @param array $form_state
+ * @param object $node
+ * @return array
+ */
 function webform_default_fields_reset_components_form($form, $form_state, $node) {
   $type_url_str = str_replace('-', '_', $node->type);
   $default_nid = _webform_default_fields_container_node($type_url_str);
@@ -67,16 +79,14 @@ function webform_default_fields_reset_components_form($form, $form_state, $node)
       array(
         'data' => array( 
           '#type' => 'item',
-          '#description' => 
-            t('(Field Key: ') . $val['form_key'] . '; ' .
-            t('Type: ') . $val['type'] . ')',
+          '#description' => t('(Field Key: %KEY%; Type: %TYPE%)', array('%KEY%' => $val['form_key'], '%TYPE%' => $val['type'])),
           '#title' => $val['name'] 
         )
       ),
       array(
        'data' => array( 
           '#type' => 'item',
-          '#title' => $val['#modify'], 
+          '#title' => check_plain($val['#modify']), 
         )
       ),
     );
@@ -88,17 +98,24 @@ function webform_default_fields_reset_components_form($form, $form_state, $node)
       )
     );
     $form['reset_components']['table']['#rows'][$val['form_key']] = array(
-    	'data' => $row,
-    	'class' => array(
-    		$modify_styles[$val['#modify']]
-    		)
-    	);
+      'data' => $row,
+      'class' => array(
+        $modify_styles[$val['#modify']]
+        )
+      );
   }
   $form['reset_components'][] = array(
     '#type' => 'submit',
     '#value' => t('Reset'),
     '#submit' => array('webform_default_fields_reset_components_submit'),
   );
+  
+  $form['reset_components'][] = array(
+    '#type' => 'submit',
+    '#value' => t('Reset all nodes'),
+    '#submit' => array('webform_default_fields_reset_all_nodes_submit'),
+  );
+
   $form['reset_global'][] = array(
     '#type' => 'item',
     '#description' => t(
@@ -135,7 +152,12 @@ function webform_default_fields_reset_components_form($form, $form_state, $node)
   );
   return $form;
 }
- 
+
+/**
+ * Function submit for 'Reset' button.
+ * @param array $form
+ * @param array $form_state
+ */ 
 function webform_default_fields_reset_components_submit($form, &$form_state) {
   $modify = (isset($form_state['input']['modify'])) ? $form_state['input']['modify'] : array();
   $nid = $form_state['values']['nid'];
@@ -151,6 +173,36 @@ function webform_default_fields_reset_components_submit($form, &$form_state) {
   }  
 }
 
+/**
+ * Function submit for 'Reset all' button.
+ * @param array $form
+ * @param array $form_state
+ */
+function webform_default_fields_reset_all_nodes_submit($form, &$form_state) {
+  module_load_include('inc', 'webform_default_fields', '/includes/webform_default_fields.common');
+  $modify = (isset($form_state['input']['modify'])) ? $form_state['input']['modify'] : array();
+  $nid = $form_state['values']['nid'];
+  $node = node_load($nid, NULL, TRUE);
+  $nodes = webform_default_fields_select_nodes($node->type);
+  module_load_include('inc', 'webform', 'includes/webform.components');
+  foreach($nodes as $node_change) {
+    if (isset($modify['Add'])) {
+      webform_default_fields_reset_insert($modify['Add'], $node_change->vid);
+    }
+    if (isset($modify['Delete'])) {
+      webform_default_fields_reset_remove($modify['Delete'], $node_change->vid, $node);
+    }
+    if (isset($modify['Restore'])) {
+      webform_default_fields_reset_modify($modify['Restore'], $node_change->vid, $node);
+    } 
+  }
+}
+
+/**
+ * function submit for 'Reset global' button.
+ * @param array $form
+ * @param array $form_state
+ */
 function webform_default_fields_reset_global_submit($form, &$form_state) {
   $nid = $form_state['values']['nid'];
   $node = node_load($nid, NULL, TRUE);
@@ -169,7 +221,7 @@ function webform_default_fields_reset_global_submit($form, &$form_state) {
     $sub_webform = $default_node->webform;
     $settings_webform = FALSE;
   }
-  unset ($resets['settings']);
+  unset($resets['settings']);
   foreach ($resets as $res_key => &$reset) {
     $reset = (isset($reset)) ? TRUE : FALSE;
     if ($reset != $settings_webform) {
@@ -196,34 +248,99 @@ function webform_default_fields_reset_global_submit($form, &$form_state) {
   node_save($node);  
 }
 
-function webform_default_fields_reset_insert($add_components, $nid) {
+/**
+ * Add fileds for webform default.
+ * @param array $add_components
+ * @param int $nid
+ * @param bool $modify
+ */
+function webform_default_fields_reset_insert($add_components, $nid, $modify = FALSE) {
   $node = node_load($nid);
   $type_url_str = str_replace('-', '_', $node->type);
   $default_nid = _webform_default_fields_container_node($type_url_str);
   $default_node = node_load($default_nid);
   foreach ($add_components as $add_component) {
-    $component = $default_node->webform['components'][$add_component];
-    $component['cid'] = NULL;
-    $component['nid'] = $nid;
-    webform_component_insert($component);
+    if (!webform_default_fields_components_exist($default_node, $node, $add_component) || $modify) {
+      $component = $default_node->webform['components'][$add_component];
+      $component['cid'] = NULL;
+      $component['nid'] = $nid;
+      webform_component_insert($component);
+    }
   }
 }
 
-function webform_default_fields_reset_remove($del_components, $nid) {
+/**
+ * Remove fields for webform default.
+ * @param array $del_components
+ * @param int $nid
+ * @param object $node_source
+ */
+function webform_default_fields_reset_remove($del_components, $nid, $node_source = NULL) {
   foreach ($del_components as $del_component) {
-    $master_node = node_load($nid, NULL, TRUE);
-    webform_component_delete($master_node,  $master_node->webform['components'][$del_component]);
+    $master_node = node_load($nid);
+    if (!empty($node_source)) {
+      $modify_key = webform_default_fields_components_exist($node_source, $master_node, $del_component);
+      if ($modify_key) {
+        webform_component_delete($master_node,  $master_node->webform['components'][$modify_key]);
+      }
+    } 
+    else {
+      webform_component_delete($master_node,  $master_node->webform['components'][$del_component]);
+    }
   }
 }
 
-function webform_default_fields_reset_modify($modify_components, $nid) {
-  foreach ($modify_components as $modify_component) {
-  $modify = explode('|', $modify_component);
-  webform_default_fields_reset_remove(array($modify[0]), $nid);
-  webform_default_fields_reset_insert(array($modify[1]), $nid);
+/**
+ * Modify field, if it's modified in webform default.
+ * @param array $modify_components
+ * @param int $nid
+ * @param object $node_source
+ */
+function webform_default_fields_reset_modify($modify_components, $nid, $node_source = NULL) {
+  $node = node_load($nid);
+  $type_url_str = str_replace('-', '_', $node->type);
+  $default_nid = _webform_default_fields_container_node($type_url_str);
+  $default_node = node_load($default_nid);
+  if ($nid != $default_nid) {
+    foreach ($modify_components as $modify_component) {
+      $modify = explode('|', $modify_component);
+      if (!empty($node_source)) {
+        webform_default_fields_reset_remove(array($modify[0]), $nid, $default_node);
+      }
+      else {
+        webform_default_fields_reset_remove(array($modify[0]), $nid);
+      }
+      webform_default_fields_reset_insert(array($modify[1]), $nid, TRUE);
+    }
   }
 }
 
+/**
+ * Verify exist components in webform.
+ * @param object $node
+ * @param object $node_change
+ * @param array $modify_key
+ * @return int
+ */
+function webform_default_fields_components_exist($node, $node_change, $modify_key) {
+  $flag = 0;
+  $components = $node->webform['components'];
+  if (isset($components[$modify_key]) && isset($node_change->webform['components'])){
+    foreach ($node_change->webform['components'] as $item) {
+      if ($components[$modify_key]['form_key'] == $item['form_key']) {
+        $flag = $item['cid'];
+      }
+    }  
+   }
+  return $flag;
+}
+
+/**
+ * Modify keys for components list.
+ * @param array $val
+ * @param array $def_val
+ * @return array
+ */
 function webform_default_fields_modified_keys($val, $def_val) {
   $def_val['nid']=$val['nid'];
   $def_cid = $def_val['cid'];
@@ -238,6 +355,12 @@ function webform_default_fields_modified_keys($val, $def_val) {
   return $val;
 }
 
+/**
+ * Components list comparing with webform default.
+ * @param object $node
+ * @param object $default_node
+ * @return array
+ */
 function webform_default_fields_reset_components_list($node, $default_node) {
   foreach ($default_node->webform['components'] as $def_key => $def_val) {
     foreach ($node->webform['components'] as $key => $val) {
@@ -251,9 +374,17 @@ function webform_default_fields_reset_components_list($node, $default_node) {
   return array_merge($default_node->webform['components'], $node->webform['components']);
 }
 
+/**
+ * Add elements to nid.
+ * @param array $elements
+ * @param int $nid
+ * @return array
+ */
 function webform_default_fields_reset_nid($elements, $nid) {
   foreach ($elements as &$element) {
     $element['nid'] = $nid;
   }
   return $elements;
 }
+
+

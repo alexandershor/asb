@@ -30,5 +30,9 @@ function webform_default_fields_uninstall() {
       variable_del('webform_default_fields_nid_' . $content_type->type);
       node_delete($nid);
     }
+    $allow_content_type = variable_get('webform_default_fields_allow_node_' . $content_type->type, FALSE);
+    if ($allow_content_type) {
+      variable_del('webform_default_fields_allow_node_' . $content_type->type);
+    }
   }
 }

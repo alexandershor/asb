@@ -5,9 +5,9 @@ dependencies[] = webform (7.x-4.x)
 files[] = tests/webform_default_fields.test
 testing_api = 2.x
 core = 7.x
-; Information added by Drupal.org packaging script on 2014-12-08
-version = "7.x-4.4"
+; Information added by Drupal.org packaging script on 2016-07-05
+version = "7.x-4.6"
 core = "7.x"
 project = "webform_default_fields"
-datestamp = "1418032859"
+datestamp = "1467717033"
 

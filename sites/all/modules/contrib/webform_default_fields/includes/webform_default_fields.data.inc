@@ -69,7 +69,7 @@ function _webform_default_fields_update_container_node($content_type, $old_conte
  * @param string $content_type 
  */
 function _webform_default_fields_delete_container_node($content_type, $rebuild = TRUE) {
-  if (($nid = variable_get('webform_default_fields_nid_' . $content_type, 0))) {
+  if ($nid = variable_get('webform_default_fields_nid_' . $content_type, 0)) {
     node_delete($nid);      
     if ($rebuild) {
       menu_rebuild();
