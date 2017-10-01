@@ -19,7 +19,7 @@ function trip_admin_help($path, $arg) {
 /**
  * Implementation of hook_permission().
  */
-function hook_permission() {
+function trip_admin_permission() {
   return array(
     'administer all application processes' => array(
       'title' => t('Administer all application processes'),
@@ -166,7 +166,7 @@ function trip_admin_apppro_trips($node) {
 function trip_admin_apppro_sort($apppro) {
 
   $fied_status = field_get_items('node',$apppro,'field_apppro_status');
-
+  $output = '';
   if ($fied_status[0]['value'] != 'closed') {
     $output .= t('Applications and/or ranking for this application
       process are currently open.  They both must be closed in order to sort
@@ -188,12 +188,14 @@ function trip_admin_apppro_sort($apppro) {
     $output .= t('<p>Please review the settings for this application process one
       more time before running the sort.  If you need to make any changes, select
       the <em>edit</em> tab above.</p>');
-    $output .= drupal_render(node_view($apppro));
+    $elements = node_view($apppro);
+    $output .= drupal_render($elements);
     $output .= '<p>Sorting may take a minute or two.  Would you like to continue?</p>';
-    $output .= drupal_render(drupal_get_form('_trip_admin_apppro_sort_form', $apppro->nid));
+    $elements = drupal_get_form('_trip_admin_apppro_sort_form', $apppro->nid);
+    $output .= drupal_render($elements);
   }
 
-  return($output);
+  return $output;
 }
 
 function _trip_admin_apppro_sort_form($form, &$form_state, $apppro_nid) {
@@ -227,9 +229,12 @@ function _trip_admin_apppro_sort_form_submit($form, &$form_state) {
     $data_table = $apppro_nid . "_applicants_data";
 
     _trip_admin_apppro_sort_tables($apppro_nid, $data_table, $accepted_table);
+
     _trip_admin_apppro_sort_sort($apppro_nid, $data_table, $accepted_table);
     _trip_admin_apppro_sort_waitlist($apppro_nid, $data_table);
+
     batch_set(_trip_admin_apppro_sort_save($apppro_nid, $data_table));
+
   }
   else {
     drupal_set_message(t('Sorting was not performed.'));
@@ -241,11 +246,12 @@ function _trip_admin_apppro_sort_tables($apppro_nid, $data_table, $accepted_tabl
   //create a temporary table to store applicants for the current
   //process given a rank.  If they weren't ranked by any leader, they definitely
   //won't be accepted.
-  db_query("DROP TABLE {$accepted_table}");
-  db_query("DROP TABLE {$data_table}");
+
+  db_query("DROP TABLE IF EXISTS {$accepted_table}");
+  db_query("DROP TABLE IF EXISTS {$data_table}");
 
   $success = db_query("CREATE TABLE {$accepted_table}
-    (`tripapp_nid` int(10), `uid` int(10), `trip_nid` int(10), `preference` int(2), `rank` int(2))");
+  (`tripapp_nid` int(10), `uid` int(10), `trip_nid` int(10), `preference` int(2), `rank` int(2))");
 
   //create another temporary table to store the data from the nodes and
   //set accepted status for everyone for current year to be 0.  This avoids
@@ -257,7 +263,8 @@ function _trip_admin_apppro_sort_tables($apppro_nid, $data_table, $accepted_tabl
   $tripapps->set_arguments(array($apppro_nid));
   $tripapps->preview();
   $tripapps_data = $tripapps->result;
-
+  $data_insert_substring = '';
+  $accepted_insert_substring = '';
   foreach ($tripapps_data as $tripapp) {
     $trip = isset($tripapp->field_field_tripapp_trip[0]['raw']['target_id']) ? $tripapp->field_field_tripapp_trip[0]['raw']['target_id'] : "0";
     $pref = isset($tripapp->field_field_tripapp_pref[0]['raw']['value']) ? $tripapp->field_field_tripapp_pref[0]['raw']['value'] : "0";
@@ -295,8 +302,8 @@ function _trip_admin_apppro_sort_tables($apppro_nid, $data_table, $accepted_tabl
 
   $num_entries = db_query("SELECT COUNT(*) as count FROM {$accepted_table}")->fetchField();
   if (!$num_entries) {
-    db_query("DROP TABLE {$accepted_table}");
-    db_query("DROP TABLE {$data_table}");
+    db_query("DROP TABLE IF EXISTS {$accepted_table}");
+    db_query("DROP TABLE IF EXISTS {$data_table}");
     drupal_set_message(t('There are either no applications or no rankings!  Please ensure that there are both applications and rankings before running the sort.'), 'error');
     drupal_goto('node/' . $apppro_nid . '/sort');
   }
@@ -386,7 +393,7 @@ function _trip_admin_apppro_sort_sort($apppro_nid, $data_table, $accepted_table)
       }
     }
   }
-  db_query("DROP TABLE {$accepted_table}");
+  db_query("DROP TABLE IF EXISTS {$accepted_table}");
 }
 
 function _trip_admin_apppro_sort_waitlist($apppro_nid, $data_table) {
@@ -450,7 +457,7 @@ function _trip_admin_apppro_sort_save_batch($apppro_nid, $data_table, &$context)
     node_save($tripapp_node);
 
 
-    $tripapp_node = node_load($tripapp->nid, NULL, TRUE);
+    //$tripapp_node = node_load($tripapp->nid, NULL, TRUE);
     // Update our progress information.
     $context['sandbox']['progress']++;
     $context['sandbox']['current_row']++;
@@ -466,7 +473,7 @@ function _trip_admin_apppro_sort_save_batch($apppro_nid, $data_table, &$context)
 }
 
 function _trip_admin_apppro_sort_finished($success, $results, $operations) {
-  db_query("DROP TABLE " . $results);
+  db_query("DROP TABLE IF EXISTS " . $results);
 
   drupal_set_message(t('The applicants have been sorted into trips and
     waitlists built.  You may view all applicants for all trips by
