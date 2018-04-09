@@ -423,7 +423,11 @@ EOF;
     }
 
   }
-  drupal_set_message(t('Sorting Finished.'));
+  drupal_set_message(t('The applicants have been sorted into trips and
+    waitlists built.  You may view all applicants for all trips by
+    selecting the <em>Roster Admin</em> tab above.  You may also view
+    applicants for a specific trip by selecting the trip from the
+    <em>Trips</em> tab above and selecting its <em>Roster</em> tab.'));
 }
 
 function _trip_admin_trip_state($trip) {
