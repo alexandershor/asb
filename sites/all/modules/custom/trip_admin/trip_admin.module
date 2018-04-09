@@ -224,7 +224,8 @@ function _trip_admin_apppro_sort_form($form, &$form_state, $apppro_nid) {
 function _trip_admin_apppro_sort_form_submit($form, &$form_state) {
   if ($form_state['clicked_button']['#value'] == 'Yes') {
     $apppro_nid = $form_state['values']['apppro_nid'];
-
+    _trip_admin_new_sort($apppro_nid);
+    return;
     $accepted_table = $apppro_nid . "_applicants_accepted";
     $data_table = $apppro_nid . "_applicants_data";
 
@@ -239,6 +240,211 @@ function _trip_admin_apppro_sort_form_submit($form, &$form_state) {
   else {
     drupal_set_message(t('Sorting was not performed.'));
   }
+}
+/*
+ * Copyright Anne Shor
+ * anneshor@stanford.edu
+ */
+function _trip_admin_new_sort($apppro_nid) {
+  $app_proc_node = node_load($apppro_nid);
+
+
+  $sql = <<< EOF
+select distinct
+appro.entity_id trip_id,
+num.field_trip_num_participants_value num
+
+ from field_data_field_trip_apppro appro 
+inner join node na on na.nid = appro.entity_id and na.status=1
+inner join field_data_field_trip_num_participants num on num.entity_id=appro.entity_id
+
+
+where appro.field_trip_apppro_target_id = :nid and appro.bundle = 'trip'
+EOF;
+  $result = db_query($sql, array(':nid'=>$apppro_nid));
+  $trips = [];
+  while ($row = $result->fetchAssoc()) {
+    $row['apps'] = [];
+    $trips[$row['trip_id']] = $row;
+
+  }
+  $users = [];
+  $sql = <<< EOF
+select
+appro.entity_id app_id,
+trip.field_tripapp_trip_target_id trip_id,
+na.uid,
+pref.field_tripapp_pref_value preference,
+r.field_tripapp_rank_value rank
+
+ from field_data_field_tripapp_appro appro 
+inner join node na on na.nid = appro.entity_id and na.status=1
+inner join field_data_field_tripapp_trip trip on trip.entity_id=appro.entity_id
+inner join field_data_field_tripapp_pref pref on pref.entity_id=appro.entity_id
+inner join field_data_field_tripapp_rank r on r.entity_id=appro.entity_id
+
+where appro.field_tripapp_appro_target_id = :nid and appro.bundle = 'trip_application'
+order by trip.field_tripapp_trip_target_id, r.field_tripapp_rank_value
+EOF;
+  $result = db_query($sql, array(':nid'=>$apppro_nid));
+  $apps = [];
+  while ($row = $result->fetchAssoc()) {
+    $row['status'] = 0;
+    $apps[$row['app_id']] = $row;
+    $trips[$row['trip_id']]['apps'][$row['app_id']] = $row;
+    if(array_key_exists($row['uid'], $users)){
+      $users[$row['uid']]['trips'][$row['trip_id']] = $row;
+    } else {
+      $users[$row['uid']] = ['trips' => [$row['trip_id']=>$row], 'offered' => []];
+    }
+
+  }
+
+  while (TRUE) {
+    $available = FALSE;
+    foreach ($trips as $trip_id => $trip) {
+      $stat = _trip_admin_trip_state($trips[$trip_id]);
+      if((intval($trip['num']) > $stat['accepted']) && count($stat['available']) > 0){
+        $available = TRUE;
+        $n = intval($trip['num'])  -  $stat['accepted'] ;
+        $i = 0;
+
+        foreach ($stat['available'] as $av_id => $av_app) {
+          $users[$av_app['uid']]['offered'][] = $trip_id;
+
+          $i++;
+          if ($i == $n) {
+            break;
+          }
+        }
+
+      }
+
+    }
+
+    if (!$available) {
+      break;
+    }
+    foreach ($users as $uid => $u) {
+      if (!empty($u['offered'])) {
+        $tid = 0;
+        $r = -1;
+        foreach ($u['offered'] as $trip_id) {
+          if($r == -1 || $u['trips'][$trip_id]['preference'] < $r) {
+            $tid = $trip_id;
+            $r = $u['trips'][$trip_id]['preference'];
+          }
+        }
+        if($tid > 0) {
+          foreach ($u['trips'] as $trip_id=>$trip) {
+            if($trip_id == $tid) {
+              $users[$uid]['trips'][$trip_id]['status'] = 3;
+              $trips[$trip_id]['apps'][$u['trips'][$trip_id]['app_id']]['status'] = 3;
+            }
+            else {
+              $trips[$trip_id]['apps'][$u['trips'][$trip_id]['app_id']]['status'] = -1;
+              unset($users[$uid]['trips'][$trip_id]);
+            }
+          }
+        }
+        $users[$uid]['offered'] = [];
+      }
+    }
+  }
+
+
+
+  $wlist_size = intval( $app_proc_node->field_apppro_waitlist_size[LANGUAGE_NONE][0]['value']);
+
+  while (TRUE) {
+    $available = FALSE;
+    foreach ($trips as $trip_id => $trip) {
+      $stat = _trip_admin_trip_state($trip);
+      if(($wlist_size > $stat['waitlisted']) && count($stat['available']) > 0){
+        $available = TRUE;
+        $n = $wlist_size  -  $stat['waitlisted'] ;
+        $i = 0;
+
+        foreach ($stat['available'] as $av_id => $av_app) {
+          $users[$av_app['uid']]['offered'][] = $trip_id;
+          $i++;
+          if ($i == $n) {
+            break;
+          }
+        }
+
+      }
+
+    }
+
+    if (!$available) {
+      break;
+    }
+    foreach ($users as $uid => $u) {
+      if (!empty($u['offered'])) {
+        $tid = 0;
+        $r = -1;
+        foreach ($u['offered'] as $trip_id) {
+          if($r == -1 || $u['trips'][$trip_id]['preference'] < $r) {
+            $tid = $trip_id;
+            $r = $u['trips'][$trip_id]['preference'];
+          }
+        }
+        if($tid > 0) {
+          foreach ($u['trips'] as $trip_id=>$trip) {
+            if($trip_id == $tid) {
+              $users[$uid]['trips'][$trip_id]['status'] = 2;
+              $trips[$trip_id]['apps'][$u['trips'][$trip_id]['app_id']]['status'] = 2;
+            }
+            else {
+              $trips[$trip_id]['apps'][$u['trips'][$trip_id]['app_id']]['status'] = -1;
+              unset($users[$uid]['trips'][$trip_id]);
+            }
+          }
+        }
+        $users[$uid]['offered'] = [];
+      }
+    }
+  }
+
+  $map = [
+    3 => 'Accepted',
+    0 => 'Rejected',
+    2 => 'Waitlisted',
+    -1 => 'Withdrawn'
+  ];
+  foreach ($trips as $tid => $trip) {
+
+    foreach ($trip['apps'] as $app_id => $a) {
+      $app = node_load($app_id);
+      $app->field_tripapp_status[LANGUAGE_NONE][0]['value'] =$map[$a['status']];
+      node_save($app);
+
+    }
+
+  }
+  drupal_set_message(t('Sorting Finished.'));
+}
+
+function _trip_admin_trip_state($trip) {
+  $accepted = 0;
+  $waitlisted = 0;
+  $available = [];
+  foreach ($trip['apps'] as $app_id => $app) {
+    if($app['status'] == -1) {
+      continue;
+    }
+    if($app['status'] == 3) {
+      $accepted++;
+    }
+    else if($app['status'] == 2) {
+      $waitlisted++;
+    }
+    else {
+      $available[$app_id] = $app;
+    }
+  }
+  return ['accepted'=>$accepted, 'waitlisted'=>$waitlisted, 'available'=>$available];
 }
 
 
