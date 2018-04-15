@@ -4,7 +4,7 @@
  * @file
  * Provides online application, selection, and assignment functions
  */
-
+require_once (DRUPAL_ROOT . '/vendor/autoload.php');
 /**
  * Implementation of hook_help().
  */
@@ -113,6 +113,16 @@ function trip_admin_menu() {
     'type' => MENU_LOCAL_TASK,
     'weight' => 5,
   );
+  $items['node/%node/download.xlsx'] = array(
+    'title' => t("Download"),
+    'description' => t("Download applicants"),
+    'access callback' => '_trip_admin_local_tasks',
+    'access arguments' => array(1, 'download'),
+    'page callback' => 'trip_admin_apppro_download',
+    'page arguments' => array(1),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 6,
+  );
 
 
   return $items;
@@ -129,6 +139,7 @@ function _trip_admin_local_tasks($node, $task) {
       switch ($task) {
         case 'sort':
         case 'trips':
+        case 'download':
           if (user_access('administer all application processes')) {
             return TRUE;
           }
@@ -690,4 +701,236 @@ function _trip_admin_apppro_sort_finished($success, $results, $operations) {
     selecting the <em>Roster Admin</em> tab above.  You may also view
     applicants for a specific trip by selecting the trip from the
     <em>Trips</em> tab above and selecting its <em>Roster</em> tab.'));
+}
+
+function trip_admin_apppro_download($apppro) {
+  $app = trip_admin_apppro_roster($apppro);
+  $phpExcel = new PHPExcel;
+  $writer = PHPExcel_IOFactory::createWriter($phpExcel, "Excel2007");
+  $sheet = $phpExcel ->getActiveSheet();
+  $sheet->setTitle('Roster');
+  $header_style = [
+    'font' => [
+      'size'=>14,
+      'bold'=>1,
+
+    ],
+    'fill' => [
+      'type' => PHPExcel_Style_Fill::FILL_SOLID,
+      'color'=> [
+        'rgb'=>'00FF00'
+      ]
+    ]
+  ];
+  $header2_style = [
+    'font' => [
+      'size'=>12,
+      'bold'=>1,
+
+    ],
+    'fill' => [
+      'type' => PHPExcel_Style_Fill::FILL_SOLID,
+      'color'=> [
+        'rgb'=>'00FFFF'
+      ]
+    ]
+  ];
+  $header3_style = [
+    'font' => [
+      'size'=>14,
+      'bold'=>1,
+
+    ],
+    'fill' => [
+      'type' => PHPExcel_Style_Fill::FILL_SOLID,
+      'color'=> [
+        'rgb'=>'FF0000'
+      ]
+    ]
+  ];
+
+  $accepted_style = [
+    'font' => [
+      'size'=>12,
+
+    ],
+    'fill' => [
+      'type' => PHPExcel_Style_Fill::FILL_SOLID,
+      'color'=> [
+        'rgb'=>'EA9999'
+      ]
+    ]
+  ];
+
+  $wlisted_style = [
+    'font' => [
+      'size'=>12,
+    ],
+    'fill' => [
+      'type' => PHPExcel_Style_Fill::FILL_SOLID,
+      'color'=> [
+        'rgb'=>'FFFF00'
+      ]
+    ]
+  ];
+
+  $rejected_style = [
+    'font' => [
+      'size'=>12,
+
+    ],
+    'fill' => [
+      'type' => PHPExcel_Style_Fill::FILL_SOLID,
+      'color'=> [
+        'rgb'=>'FF9900'
+      ]
+    ]
+  ];
+
+  $max = 0;
+  $i = 0;
+  $count_trips = count($app['trips']);
+  $sheet->getStyleByColumnAndRow(0,1,2*$count_trips -1,1)
+    ->applyFromArray($header_style);
+  $sheet->getStyleByColumnAndRow(0,2,2*$count_trips -1,2)
+    ->applyFromArray($header2_style);
+
+  foreach ($app['trips'] as $trip) {
+    $sheet->getCellByColumnAndRow($i*2,1)->setValue($trip['title']);
+    $sheet ->getCellByColumnAndRow($i*2,2)->setValue('Participants');
+    $sheet ->getCellByColumnAndRow($i*2+1,2)->setValue('Emails');
+
+    $sheet->mergeCellsByColumnAndRow(2*$i,1,2*$i+1,1);
+    $j = 0;
+    foreach ($trip['accepted'] as $p) {
+      $sheet->getCellByColumnAndRow($i*2,3+$j)->setValue($p['name']);
+      $sheet->getCellByColumnAndRow($i*2+1,3+$j)->setValue($p['mail']);
+      $j++;
+    }
+    foreach ($trip['wlisted'] as $p) {
+      $sheet->getCellByColumnAndRow($i*2,3+$j)->setValue($p['name']);
+      $sheet->getCellByColumnAndRow($i*2+1,3+$j)->setValue($p['mail']);
+      $j++;
+    }
+    if ($max < $j) {
+      $max = $j;
+    }
+    $sheet->getStyleByColumnAndRow($i*2,3,
+      $i*2+1,2+count($trip['accepted']))
+      ->applyFromArray($accepted_style);
+    $sheet->getStyleByColumnAndRow($i*2,3+count($trip['accepted']),
+      $i*2+1,2 +count($trip['accepted'])+count($trip['wlisted']))
+      ->applyFromArray($wlisted_style);
+    $i++;
+  }
+
+  $N = $max + 6;
+  $sheet->getStyleByColumnAndRow(0,$N)
+    ->applyFromArray($header3_style);
+  $sheet->getCellByColumnAndRow(0,$N)->setValue('Rejections');
+
+  $sheet->getStyleByColumnAndRow(0,$N+1, 1,$N+1)
+    ->applyFromArray($header2_style);
+
+  $sheet->getCellByColumnAndRow(0,$N+1)->setValue('Participants');
+  $sheet->getCellByColumnAndRow(1,$N+1)->setValue('Emails');
+
+  $sheet->getStyleByColumnAndRow(0,$N+2, 1,$N+1+ count($app['rejected']))
+    ->applyFromArray($rejected_style);
+  $j = 0;
+  foreach ($app['rejected'] as $p) {
+    $sheet->getCellByColumnAndRow(0,$N+2+$j)->setValue($p['name']);
+    $sheet->getCellByColumnAndRow(1,$N+2+$j)->setValue($p['mail']);
+    $j++;
+  }
+/*
+  dsm($app);
+  $writer->save('/tmp/products.xlsx');
+  return "OK";
+*/
+  //drupal_add_http_header('Content-Type','application/vnd.ms-excel');
+
+  drupal_add_http_header('Content-disposition','attachment;filename="application_process_'+$apppro->nid+'.xlsx"');
+
+  drupal_add_http_header('Cache-Control','max-age=0');
+
+  $writer->save('php://output');
+}
+
+function trip_admin_apppro_roster($apppro) {
+  $trips = [];
+  $sql = <<< EOF
+select 
+appro.entity_id trip_id,
+na.title
+
+ from field_data_field_trip_apppro appro 
+inner join node na on na.nid = appro.entity_id and na.status=1
+
+
+
+where appro.field_trip_apppro_target_id = :nid and appro.bundle = 'trip'
+EOF;
+  ;
+  $result = db_query($sql, array(':nid'=>$apppro->nid));
+
+  $trips = [];
+  $rejected = [];
+  while ($row = $result->fetchAssoc()) {
+    $row['accepted'] = [];
+    $row['wlisted'] = [];
+
+    $trips[$row['trip_id']] = $row;
+
+  }
+
+
+  $sql = <<< EOF
+select 
+ftrip.field_tripapp_trip_target_id trip_id,
+na.nid,
+na.title,
+ar.field_tripapp_rank_value rank,
+u.mail,
+u.name,
+st.field_tripapp_status_value status
+
+
+
+ from field_data_field_trip_apppro ap
+ inner join field_data_field_tripapp_trip ftrip
+  on  ftrip.field_tripapp_trip_target_id = ap.entity_id and  ftrip.entity_type='node'  and  ftrip.bundle='trip_application'
+  
+inner join node na on na.nid = ftrip.entity_id and na.status=1
+left join field_data_field_tripapp_rank ar on ar.entity_type='node' and ar.entity_id=ftrip.entity_id
+inner join users u on u.uid = na.uid
+left join field_data_field_tripapp_status st on st.entity_type='node' and st.entity_id=ftrip.entity_id
+
+
+where ap.field_trip_apppro_target_id = :nid and ap.bundle = 'trip'
+order by ar.field_tripapp_rank_value
+EOF;
+  ;
+  $result = db_query($sql, array(':nid'=>$apppro->nid));
+
+  while ($row = $result->fetchAssoc()) {
+    $trip_id = $row['trip_id'];
+    switch ($row['status']) {
+      case 'Accepted':
+        $trips[$trip_id]['accepted'][] = $row;
+        break;
+      case 'Waitlisted':
+        $trips[$trip_id]['wlisted'][] = $row;
+        break;
+      case 'Rejected':
+        if(!array_key_exists($row['name'], $rejected)) {
+          $rejected[$row['name']] = $row;
+        }
+        break;
+    }
+
+  }
+
+  return $app = ['trips'=>$trips, 'rejected'=>$rejected];
+
 }
