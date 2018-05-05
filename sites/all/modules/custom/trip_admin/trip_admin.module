@@ -29,6 +29,21 @@ function trip_admin_permission() {
   );
 }
 /**
+ * Implements hook_theme().
+ */
+function trip_admin_theme($existing, $type, $theme, $path) {
+  $path = drupal_get_path('module', 'trip_admin');
+  $themes = array (
+    'current_trips' => array(
+      'template' => 'theme/current_trips',
+      'arguments' => array('app_pro'=>NULL, 'trips'=>NULL),
+      'path' => $path
+    ),
+  );
+  return $themes;
+}
+
+/**
  * Implementation of hook_form_alter().
  */
 function trip_admin_form_alter(&$form, &$form_state, $form_id) {
@@ -37,6 +52,102 @@ function trip_admin_form_alter(&$form, &$form_state, $form_id) {
     $form['actions']['submit']['#submit'][] = '_trip_admin_update_ranks_submit';
   }
 
+
+  if($form_id == 'trip_application_node_form'){
+
+    $is_new = empty($form['nid']['#value']);
+
+    if($is_new) {
+
+    }
+
+    $form['#validate'][] = 'trip_admin_application_form_validate';
+
+  }
+
+}
+function trip_admin_application_form_validate($form, &$form_state) {
+  // Random example, if the title is 'test' throw an error
+  //if ($form_state['values']['title'] == 'test') {
+   // form_set_error('title', 'Title cannot be "test"');
+ // }
+  //dsm($form_state['values']);
+  global $user;
+
+  $app_pro = $form_state['values']['field_tripapp_appro'][LANGUAGE_NONE][0]['target_id'];
+  $trip = $form_state['values']['field_tripapp_trip'][LANGUAGE_NONE][0]['target_id'];
+  $pref = $form_state['values']['field_tripapp_pref'][LANGUAGE_NONE][0]['value'];
+  $is_new = (empty($form_state['values']['nid']));
+  //form_set_error('title','test');
+  $applied = trip_admin_current_applications($app_pro, $user->uid);
+  form_set_error('title',print_r($applied,TRUE));
+  if($is_new) {
+    if (count($applied) >= 3) {
+      form_set_error('field_tripapp_pref', 'Maximum number of trip applications (3) reached');
+      return;
+    }
+    foreach ($applied as $tid => $p) {
+      if($trip == $tid){
+        $node = node_load($tid);
+        form_set_error('field_tripapp_pref', 'Already applied for this trip '. $node->title);
+        return;
+      }
+      elseif ($p == $pref) {
+        $node = node_load($tid);
+        form_set_error('field_tripapp_pref', 'Already applied for '. $node->title . ' with preference '. $p);
+        return;
+      }
+    }
+  }
+  else {
+    foreach ($applied as $tid => $p) {
+      if($p == $pref && $tid != $trip) {
+        $node = node_load($tid);
+        form_set_error('field_tripapp_pref', 'Already applied for '. $node->title . ' with preference '. $p);
+        return;
+      }
+    }
+  }
+
+}
+
+function trip_admin_current_applications($app_pro, $uid) {
+  $sql = <<< EOF
+select t.field_tripapp_trip_target_id trip, p.field_tripapp_pref_value pre
+from field_data_field_tripapp_pref p ,
+field_data_field_tripapp_appro pro, field_data_field_tripapp_trip t , node tan
+where pro.field_tripapp_appro_target_id = :app_pro and pro.bundle='trip_application'
+and t.entity_type='node' and t.entity_id=pro.entity_id
+and p.entity_type='node' and p.entity_id=pro.entity_id
+and tan.nid = pro.entity_id and tan.uid = :uid
+EOF;
+  $result = db_query($sql, array(':app_pro'=>$app_pro, ':uid'=>$uid));
+
+  $r = array();
+  while ($row = $result->fetchAssoc()) {
+    $r[$row['trip']] = $row['pre'];
+  }
+  return $r;
+}
+
+function trip_admin_last_answers($app_pro, $uid) {
+  $sql = <<< EOF
+select q1.field_question_1_value a1, q2.field_question_2_a_value a2
+from 
+field_data_field_tripapp_appro pro
+ inner join  node tan on tan.nid = pro.entity_id and tan.uid = :uid
+ left join field_data_field_question_1 q1 on q1.entity_type='node' and q1.entity_id=pro.entity_id
+ left join field_data_field_question_2_a q2 on q2.entity_type='node' and q2.entity_id=pro.entity_id
+where pro.field_tripapp_appro_target_id = :app_pro and pro.bundle='trip_application'
+order by tan.created desc limit 1
+EOF;
+  $result = db_query($sql, array(':app_pro'=>$app_pro, ':uid'=>$uid));
+
+
+  if ($row = $result->fetchAssoc()) {
+    return $row;
+  }
+  return array('a1'=>"", 'a2'=>"");
 }
 
 function trip_admin_node_access($node, $op, $account) {
@@ -123,9 +234,49 @@ function trip_admin_menu() {
     'type' => MENU_LOCAL_TASK,
     'weight' => 6,
   );
+  $items['admin/config/asb'] = array(
+    'title' => 'ASB config',
+    'description' => 'Configuration for ASB',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('trip_admin_config_form'),
+    'access arguments' => array('administer all application processes'),
+    'type' => MENU_NORMAL_ITEM,
+  );
 
 
   return $items;
+}
+
+function trip_admin_config_form($form, &$form_state) {
+  $sql = <<< EOF
+select
+  n.nid, n.title from node n where n.type='app_process' and n.status=1
+order by n.created desc 
+EOF;
+  $result = db_query($sql, array());
+
+  $options = array(0 => ' - None - ');
+  while ($row = $result->fetchAssoc()) {
+    $options[$row['nid']] = $row['title'];
+  }
+  $form['trip_admin_active_asb'] = array(
+    '#type' => 'select',
+    '#title' => t('Active ASB'),
+    '#default_value' => variable_get('trip_admin_active_asb', 0),
+    '#options' => $options,
+    '#description' => t('Active ASB'),
+    '#required' => TRUE,
+  );
+  $form['trip_admin_active_tgb'] = array(
+    '#type' => 'select',
+    '#title' => t('Active TGB'),
+    '#default_value' => variable_get('trip_admin_active_tgb', 0),
+    '#options' => $options,
+    '#description' => t('Active TGB'),
+    '#required' => TRUE,
+  );
+
+  return system_settings_form($form);
 }
 
 /**
@@ -934,3 +1085,69 @@ EOF;
   return $app = ['trips'=>$trips, 'rejected'=>$rejected];
 
 }
+
+
+/**
+ * Implements hook_block_info().
+ */
+function trip_admin_block_info() {
+  return array(
+    'current_trips' => array(
+      'info' => t('Current Trips'),
+    )
+  );
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function trip_admin_block_view($delta = '') {
+  $sql = <<< EOF
+select n.nid, n.title,
+tl.field_trip_location_value trip_location,
+td.field_trip_description_value trip_description,
+(
+select p.field_tripapp_pref_value from field_data_field_tripapp_trip ft , node tn ,
+field_data_field_tripapp_pref p
+where ft.field_tripapp_trip_target_id = ap.entity_id and ft.bundle='trip_application'
+and tn.nid=ft.entity_id and tn.status=1 and tn.uid = :uid
+and p.entity_type='node' and p.entity_id=ft.entity_id 
+
+) pref
+ from  field_data_field_trip_apppro ap 
+inner join node n on n.nid = ap.entity_id and n.status=1
+left join field_data_field_trip_location tl on tl.entity_type='node' and tl.entity_id=ap.entity_id
+left join field_data_field_trip_description td on td.entity_type='node' and td.entity_id=ap.entity_id
+where ap.field_trip_apppro_target_id = :app_pro and ap.bundle='trip'
+EOF;
+  $block = array();
+  switch ($delta) {
+    case 'current_trips':
+      global $user;
+      $tp = arg(1);
+      dsm($tp);
+      $app_pro_nid = ($tp == '23293' ? variable_get('trip_admin_active_tgb', 0) :
+        ($tp == '23292' ? variable_get('trip_admin_active_asb', 0) : 0)
+      );
+
+      $app_pro = NULL;
+      $trips = array();
+      if(!empty($app_pro_nid)) {
+        $app_pro = node_load($app_pro_nid);
+        if(!empty($app_pro)) {
+          $result = db_query($sql, array(':app_pro'=>$app_pro_nid, ':uid'=>$user->uid));
+
+          while ($row = $result->fetchAssoc()) {
+            $trips[] = $row;
+          }
+        }
+      }
+      $block['title'] = '<none>';
+      $block['content'] = theme('current_trips',
+        array('app_pro'=>$app_pro, 'trips'=>$trips));
+
+      break;
+  }
+  return $block;
+}
+

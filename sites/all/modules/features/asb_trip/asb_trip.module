@@ -126,7 +126,39 @@ function asb_trip_form_trip_application_node_form_alter(&$form, &$form_state, $f
 
   }
 
-  $roles = array(11,13,15,16);
+  if (isset($_GET['field_tripapp_appro'])){
+
+    $node = node_load($_GET['field_tripapp_appro']);
+
+    //Grab custom question from node
+
+    if(isset($node->field_general_question_1[LANGUAGE_NONE][0]['safe_value'])){
+
+      $custom_question = $node->field_general_question_1[LANGUAGE_NONE][0]['safe_value'];
+
+      // Set value of field_answer to custom question from Trip
+      $form['field_question_1']['und']['#title'] = $custom_question;
+      $form['field_question_1']['und'][0]['#title'] = $custom_question;
+      $form['field_question_1']['und'][0]['value']['#title'] = $custom_question;
+    }
+
+    if(isset($node->field_general_question_2[LANGUAGE_NONE][0]['safe_value'])){
+
+      $custom_question = $node->field_general_question_1[LANGUAGE_NONE][0]['safe_value'];
+
+      // Set value of field_answer to custom question from Trip
+      $form['field_question_2_a']['und']['#title'] = $custom_question;
+      $form['field_question_2_a']['und'][0]['#title'] = $custom_question;
+      $form['field_question_2_a']['und'][0]['value']['#title'] = $custom_question;
+    }
+    $last_answers = trip_admin_last_answers($_GET['field_tripapp_appro'],$user->uid);
+    $form['field_question_1'][LANGUAGE_NONE][0]['value']['#default_value']= $last_answers['a1'];
+    $form['field_question_2_a'][LANGUAGE_NONE][0]['value']['#default_value'] = $last_answers['a2'];
+
+
+  }
+
+  $roles = array(11,13,15,16,17);
   $role_keys = array_keys($user->roles);
   $matches = array_intersect($roles, $role_keys);
 
