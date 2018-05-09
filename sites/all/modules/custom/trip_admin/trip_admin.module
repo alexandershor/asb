@@ -1125,7 +1125,7 @@ EOF;
     case 'current_trips':
       global $user;
       $tp = arg(1);
-      dsm($tp);
+      //dsm($tp);
       $app_pro_nid = ($tp == '23293' ? variable_get('trip_admin_active_tgb', 0) :
         ($tp == '23292' ? variable_get('trip_admin_active_asb', 0) : 0)
       );
