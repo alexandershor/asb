@@ -68,7 +68,7 @@ foreach ($trips as $trip){
     <td>
       <?php print $trip['trip_location'];?>
     </td>
-
+    <?php if(user_is_logged_in()) {?>
     <td>
       <?php if(empty($trip['pref'])){
         if($n > 0) {
@@ -80,6 +80,7 @@ foreach ($trips as $trip){
         Applied (#<?php print $trip['pref'];?>)
       <?php }?>
     </td>
+    <?php } ?>
   </tr>
 
  <?php
