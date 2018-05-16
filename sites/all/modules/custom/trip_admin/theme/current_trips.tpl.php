@@ -5,6 +5,7 @@
 <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/qtip2/3.0.3/jquery.qtip.min.js"></script>
 
 <?php
+global $base_url;
 $path = current_path();
 $n = 3;
 foreach ($trips as $trip) {
@@ -57,7 +58,7 @@ foreach ($trips as $trip){
   <tr>
     <td>
       <div  class="ttp" style="width:100%">
-        <a href="../../node/<?php print $trip['nid'];?>"><?php print $trip['title'];?></a>
+        <a href="<?php print $base_url;?>/node/<?php print $trip['nid'];?>"><?php print $trip['title'];?></a>
       </div>
 
       <div class="tooltiptext" style="display: none;">
@@ -72,7 +73,7 @@ foreach ($trips as $trip){
       <?php if(empty($trip['pref'])){
         if($n > 0) {
           ?>
-          <a class="btn" href="../../node/add/trip-application?field_tripapp_appro=<?php print $app_pro->nid;?>&field_tripapp_trip=<?php print $trip['nid'];?>&destination=<?php print $path;?>">Apply</a>
+          <a class="btn" href="<?php print $base_url;?>/node/add/trip-application?field_tripapp_appro=<?php print $app_pro->nid;?>&field_tripapp_trip=<?php print $trip['nid'];?>&destination=<?php print $path;?>">Apply</a>
           <?php
         }
       } else {?>
