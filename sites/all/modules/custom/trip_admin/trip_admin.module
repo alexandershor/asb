@@ -80,7 +80,7 @@ function trip_admin_application_form_validate($form, &$form_state) {
   $is_new = (empty($form_state['values']['nid']));
   //form_set_error('title','test');
   $applied = trip_admin_current_applications($app_pro, $user->uid);
-  form_set_error('title',print_r($applied,TRUE));
+  //form_set_error('title',print_r($applied,TRUE));
   if($is_new) {
     if (count($applied) >= 3) {
       form_set_error('field_tripapp_pref', 'Maximum number of trip applications (3) reached');

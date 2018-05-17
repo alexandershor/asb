@@ -144,7 +144,7 @@ function asb_trip_form_trip_application_node_form_alter(&$form, &$form_state, $f
 
     if(isset($node->field_general_question_2[LANGUAGE_NONE][0]['safe_value'])){
 
-      $custom_question = $node->field_general_question_1[LANGUAGE_NONE][0]['safe_value'];
+      $custom_question = $node->field_general_question_2[LANGUAGE_NONE][0]['safe_value'];
 
       // Set value of field_answer to custom question from Trip
       $form['field_question_2_a']['und']['#title'] = $custom_question;
