@@ -13,6 +13,7 @@ foreach ($trips as $trip) {
     $n--;
   }
 }
+$open  =( "applications_open" == $app_pro->field_apppro_status[LANGUAGE_NONE][0]['value']);
 ?>
 <style>
   .qtip.my-qtip {
@@ -71,7 +72,7 @@ foreach ($trips as $trip){
     <?php if(user_is_logged_in()) {?>
     <td>
       <?php if(empty($trip['pref'])){
-        if($n > 0) {
+        if($open && $n > 0) {
           ?>
           <a class="btn" href="<?php print $base_url;?>/node/add/trip-application?field_tripapp_appro=<?php print $app_pro->nid;?>&field_tripapp_trip=<?php print $trip['nid'];?>&destination=<?php print $path;?>">Apply</a>
           <?php

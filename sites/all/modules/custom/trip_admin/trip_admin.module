@@ -1151,3 +1151,43 @@ EOF;
   return $block;
 }
 
+/**
+ * Implements hook_node_view_alter().
+ */
+function trip_admin_node_view_alter(&$build) {
+  //dsm($build);
+  $node = $build['#node'];
+  $app_pro = node_load($node->field_tripapp_appro[LANGUAGE_NONE][0]['target_id']);
+  $trip = node_load($node->field_tripapp_trip[LANGUAGE_NONE][0]['target_id']);
+
+  //dsm($app_pro);
+
+  if( isset($app_pro->field_general_question_1[LANGUAGE_NONE][0]['safe_value'])){
+
+    $custom_question = $app_pro->field_general_question_1[LANGUAGE_NONE][0]['safe_value'];
+
+    // Set value of field_answer to custom question from Trip
+    $build['field_question_1']['#title'] = $custom_question;
+  }
+
+  if( isset($app_pro->field_general_question_2[LANGUAGE_NONE][0]['safe_value'])){
+
+    $custom_question = $app_pro->field_general_question_2[LANGUAGE_NONE][0]['safe_value'];
+
+    // Set value of field_answer to custom question from Trip
+    $build['field_question_2_a']['#title'] = $custom_question;
+
+  }
+
+  //dsm($trip);
+
+  if(isset($trip->field_asb_custom_question[LANGUAGE_NONE][0]['safe_value'])){
+
+    $custom_question = $trip->field_asb_custom_question[LANGUAGE_NONE][0]['safe_value'];
+
+    // Set value of field_answer to custom question from Trip
+    $build['field_answer']['#title'] = $custom_question;
+
+  }
+}
+

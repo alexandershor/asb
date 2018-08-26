@@ -108,55 +108,67 @@ define('ASB_TRIP_SEND_EMAIL_ACTION_LABEL', 'SEND_EMAIL_TO_APPLICANT');
  */
 function asb_trip_form_trip_application_node_form_alter(&$form, &$form_state, $form_id) {
   global $user;
-  if (isset($_GET['field_tripapp_trip'])){
-
-    $node = node_load($_GET['field_tripapp_trip']);
-
-    //Grab custom question from node
-
-    if(isset($node->field_asb_custom_question[LANGUAGE_NONE][0]['safe_value'])){
-
-      $custom_question = $node->field_asb_custom_question[LANGUAGE_NONE][0]['safe_value'];
-
-      // Set value of field_answer to custom question from Trip
-      $form['field_answer']['und']['#title'] = $custom_question;
-      $form['field_answer']['und'][0]['#title'] = $custom_question;
-      $form['field_answer']['und'][0]['value']['#title'] = $custom_question;
-    }
-
-  }
+  $node = NULL;
 
   if (isset($_GET['field_tripapp_appro'])){
 
     $node = node_load($_GET['field_tripapp_appro']);
+  }
+  else {
 
-    //Grab custom question from node
+    $node = node_load($form['field_tripapp_appro'][LANGUAGE_NONE]['#default_value'][0]);
+  }
+  if (!empty($node) && "applications_open" != $node->field_apppro_status[LANGUAGE_NONE][0]['value']) {
+    drupal_goto('<front>');
 
-    if(isset($node->field_general_question_1[LANGUAGE_NONE][0]['safe_value'])){
+  }
 
-      $custom_question = $node->field_general_question_1[LANGUAGE_NONE][0]['safe_value'];
+  if(!empty($node) && isset($node->field_general_question_1[LANGUAGE_NONE][0]['safe_value'])){
 
-      // Set value of field_answer to custom question from Trip
-      $form['field_question_1']['und']['#title'] = $custom_question;
-      $form['field_question_1']['und'][0]['#title'] = $custom_question;
-      $form['field_question_1']['und'][0]['value']['#title'] = $custom_question;
-    }
+    $custom_question = $node->field_general_question_1[LANGUAGE_NONE][0]['safe_value'];
 
-    if(isset($node->field_general_question_2[LANGUAGE_NONE][0]['safe_value'])){
+    // Set value of field_answer to custom question from Trip
+    $form['field_question_1']['und']['#title'] = $custom_question;
+    $form['field_question_1']['und'][0]['#title'] = $custom_question;
+    $form['field_question_1']['und'][0]['value']['#title'] = $custom_question;
+  }
 
-      $custom_question = $node->field_general_question_2[LANGUAGE_NONE][0]['safe_value'];
+  if(!empty($node) && isset($node->field_general_question_2[LANGUAGE_NONE][0]['safe_value'])){
 
-      // Set value of field_answer to custom question from Trip
-      $form['field_question_2_a']['und']['#title'] = $custom_question;
-      $form['field_question_2_a']['und'][0]['#title'] = $custom_question;
-      $form['field_question_2_a']['und'][0]['value']['#title'] = $custom_question;
-    }
-    $last_answers = trip_admin_last_answers($_GET['field_tripapp_appro'],$user->uid);
+    $custom_question = $node->field_general_question_2[LANGUAGE_NONE][0]['safe_value'];
+
+    // Set value of field_answer to custom question from Trip
+    $form['field_question_2_a']['und']['#title'] = $custom_question;
+    $form['field_question_2_a']['und'][0]['#title'] = $custom_question;
+    $form['field_question_2_a']['und'][0]['value']['#title'] = $custom_question;
+  }
+  if(!empty($node)) {
+    $last_answers = trip_admin_last_answers($node->nid,$user->uid);
     $form['field_question_1'][LANGUAGE_NONE][0]['value']['#default_value']= $last_answers['a1'];
     $form['field_question_2_a'][LANGUAGE_NONE][0]['value']['#default_value'] = $last_answers['a2'];
 
-
   }
+
+  $node = NULL;
+  if (isset($_GET['field_tripapp_trip'])){
+
+    $node = node_load($_GET['field_tripapp_trip']);
+  }
+  else {
+    $node = node_load($form['field_tripapp_trip'][LANGUAGE_NONE]['#default_value'][0]);
+  }
+  //Grab custom question from node
+
+  if(!empty($node) && isset($node->field_asb_custom_question[LANGUAGE_NONE][0]['safe_value'])){
+
+    $custom_question = $node->field_asb_custom_question[LANGUAGE_NONE][0]['safe_value'];
+
+    // Set value of field_answer to custom question from Trip
+    $form['field_answer']['und']['#title'] = $custom_question;
+    $form['field_answer']['und'][0]['#title'] = $custom_question;
+    $form['field_answer']['und'][0]['value']['#title'] = $custom_question;
+  }
+
 
   $roles = array(11,13,15,16,17);
   $role_keys = array_keys($user->roles);
